@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pixel Blocks - Early Alpha</title>
+    <style>
+        body { margin: 0; overflow: hidden; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        #gui { position: absolute; top: 10px; left: 10px; color: white; background: rgba(0,0,0,0.6); padding: 15px; border-radius: 8px; pointer-events: none; }
+        #hotbar { position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); display: flex; gap: 10px; background: rgba(255,255,255,0.2); padding: 10px; border-radius: 12px; backdrop-filter: blur(5px); }
+        .slot { width: 50px; height: 50px; border: 2px solid #fff; border-radius: 5px; display: flex; align-items: center; justify-content: center; font-size: 24px; cursor: pointer; background: #333; transition: 0.2s; }
+        .slot:hover { transform: scale(1.1); background: #555; }
+        .slot.active { border-color: #ffeb3b; box-shadow: 0 0 10px #ffeb3b; }
+        #inventory { display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: #222; color: white; padding: 20px; border-radius: 15px; width: 300px; border: 3px solid #444; }
+    </style>
+</head>
+<body>
+
+<div id="gui">
+    <b>Pixel Blocks Alpha</b><br>
+    Move: WASD | Jump: Space<br>
+    Inventory: ` (Backtick)<br>
+    Place Block: Click
+</div>
+
+<div id="inventory">
+    <h3>Block Menu</h3>
+    <hr>
+    <p><b>Categories:</b> Natural, Building, Electrical</p>
+    <button onclick="toggleMenu()" style="width: 100%; padding: 10px; cursor: pointer;">Close</button>
+</div>
+
+<div id="hotbar">
+    <div class="slot active" onclick="setBlock('grass', 0)">🌱</div>
+    <div class="slot" onclick="setBlock('stone', 1)">🪨</div>
+    <div class="slot" onclick="setBlock('wood', 2)">🪵</div>
+</div>
+
+<script type="importmap">
+  { "imports": { "three": "https://unpkg.com/three@0.160.0/build/three.module.js" } }
+</script>
+
+<script type="module">
+    import * as THREE from 'three';
+
+    // SCENE SETUP
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x87ceeb);
+    const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    document.body.appendChild(renderer.domElement);
+
+    // LIGHTING
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
+    scene.add(ambientLight);
+    const sun = new THREE.DirectionalLight(0xffffff, 1);
+    sun.position.set(10, 20, 10);
+    scene.add(sun);
+
+    // FLOOR (The Build Area)
+    const planeGeo = new THREE.PlaneGeometry(100, 100);
+    const planeMat = new THREE.MeshStandardMaterial({ color: 0x999999 });
+    const floor = new THREE.Mesh(planeGeo, planeMat);
+    floor.rotation.x = -Math.PI / 2;
+    scene.add(floor);
+    scene.add(new THREE.GridHelper(100, 100));
+
+    // PLAYER CHARACTER
+    const playerGeo = new THREE.BoxGeometry(0.8, 1.8, 0.8);
+    const playerMat = new THREE.MeshStandardMaterial({ color: 0x2196f3 });
+    const player = new THREE.Mesh(playerGeo, playerMat);
+    player.position.y = 0.9;
+    scene.add(player);
+
+    // BUILDING LOGIC
+    let currentBlock = 'grass';
+    const blockGeo = new THREE.BoxGeometry(1, 1, 1);
+    const colors = { grass: 0x4caf50, stone: 0x757575, wood: 0x795548 };
+
+    window.setBlock = (type, index) => {
+        currentBlock = type;
+        document.querySelectorAll('.slot').forEach((s, i) => {
+            s.classList.toggle('active', i === index);
+        });
+    };
+
+    window.addEventListener('mousedown', (e) => {
+        if (e.target.tagName !== 'CANVAS') return;
+        const block = new THREE.Mesh(blockGeo, new THREE.MeshStandardMaterial({ color: colors[currentBlock] }));
+        // Simple placement based on camera look (Raycasting needed for precision later)
+        block.position.set(Math.round(player.position.x), 0.5, Math.round(player.position.z - 2));
+        scene.add(block);
+    });
+
+    // CONTROLS
+    const keys = {};
+    window.addEventListener('keydown', (e) => {
+        keys[e.code] = true;
+        if(e.key === '`') toggleMenu();
+    });
+    window.addEventListener('keyup', (e) => keys[e.code] = false);
+
+    window.toggleMenu = () => {
+        const inv = document.getElementById('inventory');
+        inv.style.display = inv.style.display === 'block' ? 'none' : 'block';
+    };
+
+    camera.position.set(0, 5, 10);
+
+    function animate() {
+        requestAnimationFrame(animate);
+        const speed = 0.1;
+        if (keys['KeyW']) player.position.z -= speed;
+        if (keys['KeyS']) player.position.z += speed;
+        if (keys['KeyA']) player.position.x -= speed;
+        if (keys['KeyD']) player.position.x += speed;
+
+        // Camera follow
+        camera.position.lerp(new THREE.Vector3(player.position.x, player.position.y + 5, player.position.z + 8), 0.1);
+        camera.lookAt(player.position);
+
+        renderer.render(scene, camera);
+    }
+    animate();
+
+    window.addEventListener('resize', () => {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+</script>
+</body>
+</html>
